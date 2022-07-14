@@ -1,0 +1,7 @@
+{
+  "delay": 2500,
+  "events": {
+    "restart": "sh -c 'lsof -i :${PORT:-4000} -t | xargs kill'",
+    "crash": "sh -c 'lsof -i :${PORT:-4000} -t | xargs kill'"
+  }
+}

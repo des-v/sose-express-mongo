@@ -1,0 +1,102 @@
+# List the start up tasks. Learn more https://www.gitpod.io/docs/config-start-tasks/
+tasks:
+  - name: read
+    init: |
+      gp open README.md
+      gp sync-done read
+
+  - name: .env-restore
+    init: gp sync-await read
+    command: |
+      if [ -f .env ]; then
+        # If this workspace already has a .env, don't override it
+        # Local changes survive a workspace being opened and closed
+        # but they will not persist between separate workspaces for the same repo
+        echo "Found .env in workspace"
+      else
+        if [ -z "${DOTENV}" ]; then
+          # There is no $DOTENV from a previous workspace
+          # Default to the example .env
+          echo "Setting example .env"
+          cp .env.example .env 
+        else
+          # After making changes to .env, run this line to persist it to $DOTENV
+          #   gp env DOTENV="$(base64 .env | tr -d '\n')"
+          # 
+          # Environment variables set this way are shared between all your workspaces for this repo
+          # The lines below will read $DOTENV and print a .env file
+          echo "Restoring .env from Gitpod"
+          echo "${DOTENV}" | base64 -d > .env
+        fi
+      fi
+      gp sync-done .env-restore
+
+  - name: plantuml-server
+    before: # plantuml server
+      docker run -d -p 8080:8080 plantuml/plantuml-server:tomcat
+    init: gp sync-await .env-restore
+    command: gp sync-done plantuml-server
+
+  - name: mongodb
+    before: # mongodb
+      docker run --name mongodb -d -p 27017:27017 -v /workspace/data:/data/db mongo
+    init: gp sync-await plantuml-server
+    command: gp sync-done mongodb
+
+  - name: dependencies
+    init: | # runs during prebuild
+      gp sync-await mongodb
+      npm install -g npm@latest
+      npm install
+    command: gp sync-done dependencies
+
+  - name: start
+    init: gp sync-await dependencies
+    command: |
+      npm run dev
+      gp sync-done start
+
+# List the ports to expose. Learn more https://www.gitpod.io/docs/config-ports/
+ports:
+  - port: 27017 # mongodb local
+    onOpen: ignore
+  - port: 3000 # local
+    # onOpen: open-browser
+    visibility: public
+  - port: 5500 # liveserver
+    onOpen: ignore
+    visibility: private
+  - port: 8080 # plantuml server http://localhost:8080
+    visibility: public
+
+# list of vscode extensions which should be installed for users of this workspace
+vscode:
+  extensions:
+    # Prettier
+    - esbenp.prettier-vscode
+    # Eslint
+    - dbaeumer.vscode-eslint
+    # Live Server
+    - ritwickdey.liveserver
+    # vscode-icons
+    - vscode-icons-team.vscode-icons
+    # ENV
+    - IronGeek.vscode-env
+    # NPM Intellisense
+    - christian-kohler.npm-intellisense
+    # GitLens
+    - eamodio.gitlens
+    # Docker
+    - ms-azuretools.vscode-docker
+    # Vetur
+    - octref.vetur
+    # Plantuml
+    - jebbs.plantuml
+    # MongoDB
+    - mongodb.mongodb-vscode
+
+#
+github:
+  prebuilds:
+    # enable checks fail when the prebuild failed
+    addCheck: prevent-merge-on-error
